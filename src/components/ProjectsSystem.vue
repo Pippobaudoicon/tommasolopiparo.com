@@ -2,7 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
 import SolarSystem, { type Planet } from "./SolarSystem.vue";
 
-type Group = "games";
+type Group = "games" | "pokemon";
 // Without a group, this is the projects system: groups (planets with moons you can fly into)
 // orbit alongside lone projects. With one, it's that group's own system, its planet at the center.
 const props = defineProps<{ group?: Group }>();
@@ -34,13 +34,24 @@ const allProjects = [
   {
     name: "PokéRole Roller",
     id: "pokerole",
-    group: "games",
+    group: "pokemon",
     tagline: "Every dice roll for a PokéRole v3 table session.",
     description: "Success pools, damage, chance dice and criticals worked out for you, plus a searchable catalogue of 305 abilities and a 1,200-species Pokédex to build your team.",
     stack: ["React", "TypeScript", "Vite"],
     site: "https://pokerole.tommasolopiparo.com",
     repo: "https://github.com/Pippobaudoicon/pokerole",
     planet: { radius: 0.365, period: 48, angle: 4.4, size: 70, light: "#efa3a3", color: "#a23d3d", shadow: "#2c0e0e" },
+  },
+  {
+    name: "PokéroleDex",
+    id: "pokeroledex",
+    group: "pokemon",
+    tagline: "Your Pokémon, trainers and campaigns, all in one place.",
+    description: "A recovery of pokeroledex.nl, rebuilt for PokéRole tables. Manage character sheets and campaigns, generate encounters, and search the v3 rulebook or ask it a question. Install it to keep previously opened references readable offline.",
+    stack: ["React", "TypeScript", "Cloudflare Workers", "D1", "PWA"],
+    site: "https://pokeroledex.tommasolopiparo.com",
+    repo: "https://github.com/Pippobaudoicon/pokeroledex",
+    planet: { radius: 0.285, period: 36, angle: 0.7, size: 64, light: "#9ee2de", color: "#287d83", shadow: "#0c2429" },
   },
   {
     name: "Reaction Test",
@@ -71,14 +82,20 @@ const allProjects = [
 const projectsIn = (group: Group) => allProjects.filter(project => project.group === group);
 // The label says it's a group, the moons show what's in it.
 const groups = [
-  { id: "games" as const, name: `Games · ${projectsIn("games").length} projects`, logo: "gamepad.svg", radius: 0.4, period: 58, angle: 3.6, size: 84, light: "#c7e6a8", color: "#557f3c", shadow: "#132210" },
+  { id: "games" as const, parent: undefined, name: `Games · ${projectsIn("games").length + projectsIn("pokemon").length} projects`, logo: "gamepad.svg", radius: 0.4, period: 58, angle: 3.6, size: 84, light: "#c7e6a8", color: "#557f3c", shadow: "#132210" },
+  { id: "pokemon" as const, parent: "games" as const, name: `Pokémon · ${projectsIn("pokemon").length} projects`, logo: undefined, radius: 0.365, period: 48, angle: 4.4, size: 70, light: "#efa3a3", color: "#a23d3d", shadow: "#2c0e0e" },
+];
+const groupsIn = (group?: Group) => groups.filter(item => item.parent === group);
+const worldsIn = (group: Group) => [
+  ...groupsIn(group).map(item => ({ id: item.id, name: item.name, planet: item })),
+  ...projectsIn(group),
 ];
 const groupNamed = (name: string) => groups.find(group => group.name === name);
 const center = groups.find(group => group.id === props.group);
 
 const projects = allProjects.filter(project => project.group === props.group);
 const planets: Planet[] = [
-  ...(center ? [] : groups),
+  ...groupsIn(props.group),
   ...projects.map(project => ({ name: project.name, logo: project.logo, ...project.planet })),
 ];
 // Each world gets its own surface and companion, styled below by its id.
@@ -128,15 +145,15 @@ onUnmounted(() => {
 
 <template>
   <SolarSystem
-    :class="{ groups: !center }"
+    :class="{ groups: groupsIn(group).length > 0 }"
     :planets="planets"
-    :label="center ? 'My games' : 'My projects'"
+    :label="center ? (center.id === 'pokemon' ? 'My Pokémon projects' : 'My games') : 'My projects'"
     :selected="selected"
     @select="select"
   >
     <span v-if="center" class="center-planet" :style="{ '--light': center.light, '--color': center.color, '--shadow': center.shadow }" aria-hidden="true">
       <span class="world" :class="center.id" />
-      <img :src="'/logos/' + center.logo" alt="" />
+      <img v-if="center.logo" :src="'/logos/' + center.logo" alt="" />
     </span>
     <slot v-else />
     <template #surface="{ planet }">
@@ -145,11 +162,11 @@ onUnmounted(() => {
     <template #companion="{ planet }">
       <span v-if="groupNamed(planet.name)" class="moons" aria-hidden="true">
         <span
-          v-for="(moon, moonIndex) in projectsIn(groupNamed(planet.name)!.id)"
+          v-for="(moon, moonIndex) in worldsIn(groupNamed(planet.name)!.id)"
           :key="moon.id"
           class="group-moon"
           :style="{
-            '--angle': (moonIndex / projectsIn(groupNamed(planet.name)!.id).length) * 360 + 'deg',
+            '--angle': (moonIndex / worldsIn(groupNamed(planet.name)!.id).length) * 360 + 'deg',
             '--light': moon.planet.light,
             '--color': moon.planet.color,
             '--shadow': moon.planet.shadow,
@@ -167,7 +184,7 @@ onUnmounted(() => {
           <span class="orbiter die" />
           <span class="orbiter die second" />
         </template>
-        <span v-else-if="idOf(planet.name) === 'pokerole'" class="orbiter moon" />
+        <span v-else-if="['pokerole', 'pokeroledex'].includes(idOf(planet.name))" class="orbiter moon" />
         <template v-else-if="idOf(planet.name) === 'lanternbound'">
           <span class="orbiter spirit" />
           <span class="orbiter spirit second" />
@@ -233,12 +250,37 @@ onUnmounted(() => {
     linear-gradient(100deg, #24569e 0 47%, #e2b75a 47% 53%, #8f1d1d 53%);
 }
 
-.world.pokerole {
+.world.pokemon {
   background:
     radial-gradient(circle at 50% 50%, #f4efe8 0 9%, #1a0f0f 10% 16%, transparent 17%),
     radial-gradient(circle at 28% 23%, #ffffff66, transparent 42%),
     radial-gradient(circle at 70% 78%, #0009, transparent 62%),
     linear-gradient(180deg, #c54444 0 46%, #1a0f0f 46% 54%, #e9e3dc 54%);
+}
+
+/* A five-pip die for the roller, distinct from the category's Poké Ball. */
+.world.pokerole::before {
+  content: "";
+  position: absolute;
+  inset: 21%;
+  border-radius: 20%;
+  rotate: -12deg;
+  background:
+    radial-gradient(circle at 25% 25%, #6b2424 0 7%, transparent 8%),
+    radial-gradient(circle at 75% 25%, #6b2424 0 7%, transparent 8%),
+    radial-gradient(circle at 50% 50%, #6b2424 0 7%, transparent 8%),
+    radial-gradient(circle at 25% 75%, #6b2424 0 7%, transparent 8%),
+    radial-gradient(circle at 75% 75%, #6b2424 0 7%, transparent 8%),
+    linear-gradient(135deg, #fff4d9, #d4af81);
+  box-shadow: inset -2px -3px 5px #8f653b55, 2px 4px 8px #0006;
+}
+
+/* A teal field guide with a lit screen and a row of catalogue entries. */
+.world.pokeroledex {
+  background:
+    radial-gradient(circle at 28% 23%, #ffffff55, transparent 42%),
+    linear-gradient(#b8eee7, #70bdbd) 50% 37% / 54% 28% no-repeat,
+    repeating-linear-gradient(90deg, #d8f7ed 0 4px, transparent 4px 9px) 50% 66% / 54% 5px no-repeat;
 }
 
 .world.reaction {

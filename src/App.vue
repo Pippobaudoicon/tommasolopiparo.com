@@ -12,8 +12,8 @@
         </SolarSystem>
       </main>
       <main v-else :key="view" class="content" :aria-label="headers[view].label">
-        <button type="button" class="back" @click="go(view === 'projects' ? 'home' : 'projects')">
-          <span aria-hidden="true">←</span> {{ view === "projects" ? "Home system" : "Projects" }}
+        <button type="button" class="back" @click="go(parents[view])">
+          <span aria-hidden="true">←</span> {{ view === "projects" ? "Home system" : view === "pokemon" ? "Games" : "Projects" }}
         </button>
         <header class="text-container">
           <p class="eyebrow">{{ headers[view].eyebrow }}</p>
@@ -21,7 +21,7 @@
           <p class="description">{{ headers[view].description }}</p>
         </header>
         <ProjectsSystem v-if="view === 'projects'" @enter="travel"><Portrait /></ProjectsSystem>
-        <ProjectsSystem v-else :group="view" />
+        <ProjectsSystem v-else :group="view" @enter="travel" />
       </main>
     </Transition>
     <SkillsTicker />
@@ -63,13 +63,21 @@ const headers = {
     eyebrow: "System 03 · Games",
     title: "Games, for the",
     highlight: "fun of it.",
-    description: "Made in my free time. Every planet here is live, with its code in the open. Pick one to read its mission log.",
+    description: "Made in my free time. Fly into the Pokémon planet for my tabletop tools, or pick a game to read its mission log.",
+  },
+  pokemon: {
+    label: "My Pokémon projects",
+    eyebrow: "System 04 · Games / Pokémon",
+    title: "A little world of",
+    highlight: "Pokémon.",
+    description: "Tools for a PokéRole table: roll the dice, build your team and keep your adventures together. Pick a planet to read its mission log.",
   },
 };
 
 type View = "home" | keyof typeof headers;
-const depth = (view: View) => (view === "home" ? 0 : view === "projects" ? 1 : 2);
-const hashes: Record<View, string> = { home: "", projects: "#projects", games: "#projects/games" };
+const parents: Record<keyof typeof headers, View> = { projects: "home", games: "projects", pokemon: "games" };
+const depth = (view: View) => (view === "home" ? 0 : view === "projects" ? 1 : view === "games" ? 2 : 3);
+const hashes: Record<View, string> = { home: "", projects: "#projects", games: "#projects/games", pokemon: "#projects/games/pokemon" };
 const viewFromHash = () => (Object.keys(hashes) as View[]).find(view => hashes[view] === location.hash) ?? "home";
 
 const view = ref<View>(viewFromHash());
